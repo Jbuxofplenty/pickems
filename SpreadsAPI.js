@@ -1,19 +1,51 @@
 /**
  * SpreadsAPI.js - Handles fetching betting spreads from ESPN API
+ * 
+ * This module fetches NFL betting lines from ESPN's scoreboard API.
+ * Includes:
+ * - Point spreads (e.g., "-5.5" for favorites)
+ * - Over/Under totals (e.g., "47.5")
+ * 
+ * Note: ESPN typically only provides odds for current/upcoming games.
+ * Historical spreads are not available through this API.
  */
 
+// ===================================================================
+// API DATA FETCHING
+// ===================================================================
+
 /**
- * Fetches spreads data from ESPN API for current week
+ * Fetches spreads data from ESPN API for current week or specific date
+ * Note: ESPN typically only provides spreads for current/upcoming games
+ * @param {string} dateString - Optional date in format YYYYMMDD or YYYY-MM-DD. Fetches all games for the week containing that date. Uses current week if not provided.
  * @return {Array} Array of game objects with spread information
  */
-function getSpreadsFromESPN() {
+function getSpreadsFromESPN(dateString) {
   var url = 'http://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard';
+  
+  // Add week parameter if date provided - this gets ALL games for that week
+  if (dateString) {
+    var weekInfo = getWeekFromDate(dateString);
+    // Use week and seasontype parameters to get all games for the week
+    url += '?seasontype=2&week=' + weekInfo.week;
+    Logger.log('Input date: ' + dateString + ' -> Using Week ' + weekInfo.week + ' of ' + weekInfo.year);
+  }
+  
+  Logger.log('Fetching from URL: ' + url);
+  
   var response = UrlFetchApp.fetch(url);
   var data = JSON.parse(response.getContentText());
   
-  var week = data.week.number;
-  var year = data.season.year;
-  var games = data.events;
+  // Handle cases where week or season might not be defined
+  var week = (data.week && data.week.number) ? data.week.number : 'N/A';
+  var year = (data.season && data.season.year) ? data.season.year : new Date().getFullYear();
+  var games = data.events || [];
+  
+  Logger.log('Week: ' + week + ', Year: ' + year + ', Games found: ' + games.length);
+  
+  if (games.length === 0) {
+    Logger.log('No games found for the specified date');
+  }
   
   var spreadsData = [];
   
@@ -53,6 +85,10 @@ function getSpreadsFromESPN() {
   
   return spreadsData;
 }
+
+// ===================================================================
+// SPREADSHEET WRITING
+// ===================================================================
 
 /**
  * Writes spreads data to the Spreads sheet
@@ -103,4 +139,3 @@ function writeSpreadsToSheet(spreadsData) {
   
   Logger.log('Spreads written to sheet: ' + spreadsData.length + ' games');
 }
-

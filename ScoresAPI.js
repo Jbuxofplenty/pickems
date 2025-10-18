@@ -1,19 +1,53 @@
 /**
  * ScoresAPI.js - Handles fetching final scores from ESPN API
+ * 
+ * This module fetches NFL game scores from ESPN's scoreboard API.
+ * Supports fetching scores for:
+ * - Current week (default)
+ * - Specific week by providing any date in that week
+ * - Historical scores (completed games)
+ * 
+ * ESPN API provides full week data including:
+ * - Final scores for completed games
+ * - Live scores for in-progress games
+ * - Scheduled games (not yet started)
  */
 
+// ===================================================================
+// API DATA FETCHING
+// ===================================================================
+
 /**
- * Fetches final scores from ESPN API for current week
+ * Fetches final scores from ESPN API for current week or specific date
+ * @param {string} dateString - Optional date in format YYYYMMDD or YYYY-MM-DD. Fetches all games for the week containing that date. Uses current week if not provided.
  * @return {Array} Array of game objects with final scores
  */
-function getScoresFromESPN() {
+function getScoresFromESPN(dateString) {
   var url = 'http://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard';
+  
+  // Add week parameter if date provided - this gets ALL games for that week
+  if (dateString) {
+    var weekInfo = getWeekFromDate(dateString);
+    // Use week and seasontype parameters to get all games for the week
+    url += '?seasontype=2&week=' + weekInfo.week;
+    Logger.log('Input date: ' + dateString + ' -> Using Week ' + weekInfo.week + ' of ' + weekInfo.year);
+  }
+  
+  Logger.log('Fetching from URL: ' + url);
+  
   var response = UrlFetchApp.fetch(url);
   var data = JSON.parse(response.getContentText());
   
-  var week = data.week.number;
-  var year = data.season.year;
-  var games = data.events;
+  // Handle cases where week or season might not be defined
+  var week = (data.week && data.week.number) ? data.week.number : 'N/A';
+  var year = (data.season && data.season.year) ? data.season.year : new Date().getFullYear();
+  var games = data.events || [];
+  
+  Logger.log('Week: ' + week + ', Year: ' + year + ', Games found: ' + games.length);
+  
+  if (games.length === 0) {
+    Logger.log('No games found for the specified date');
+  }
   
   var scoresData = [];
   
@@ -62,6 +96,10 @@ function getScoresFromESPN() {
   
   return scoresData;
 }
+
+// ===================================================================
+// SPREADSHEET WRITING
+// ===================================================================
 
 /**
  * Writes scores data to the Scores sheet
@@ -122,4 +160,3 @@ function writeScoresToSheet(scoresData) {
   
   Logger.log('Scores written to sheet: ' + scoresData.length + ' games');
 }
-
