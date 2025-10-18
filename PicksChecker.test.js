@@ -27,7 +27,8 @@ describe('PicksChecker', () => {
           team1: 'LAR',
           team2: 'JAX',
           direction: 'O',
-          line: 44.5
+          line: 44.5,
+          fuzzyMatches: []
         });
       });
 
@@ -38,7 +39,8 @@ describe('PicksChecker', () => {
           team1: 'PIT',
           team2: 'CIN',
           direction: 'U',
-          line: 45.5
+          line: 45.5,
+          fuzzyMatches: []
         });
       });
 
@@ -49,7 +51,32 @@ describe('PicksChecker', () => {
           team1: 'PHI',
           team2: 'NYG',
           direction: 'O',
-          line: 47
+          line: 47,
+          fuzzyMatches: []
+        });
+      });
+
+      test('should parse "over" word instead of "O"', () => {
+        const result = parsePick('saints/pats over 45.5');
+        expect(result).toEqual({
+          type: 'overunder',
+          team1: 'NO',
+          team2: 'NE',
+          direction: 'O',
+          line: 45.5,
+          fuzzyMatches: []
+        });
+      });
+
+      test('should parse "under" word instead of "U"', () => {
+        const result = parsePick('Rams/Jags under 44.5');
+        expect(result).toEqual({
+          type: 'overunder',
+          team1: 'LAR',
+          team2: 'JAX',
+          direction: 'U',
+          line: 44.5,
+          fuzzyMatches: []
         });
       });
     });
@@ -62,7 +89,8 @@ describe('PicksChecker', () => {
           team1: 'LAR',
           team2: 'JAX',
           direction: 'O',
-          line: 44.5
+          line: 44.5,
+          fuzzyMatches: []
         });
       });
 
@@ -73,7 +101,32 @@ describe('PicksChecker', () => {
           team1: 'PIT',
           team2: 'CIN',
           direction: 'U',
-          line: 45.5
+          line: 45.5,
+          fuzzyMatches: []
+        });
+      });
+
+      test('should parse "over" word with space separator', () => {
+        const result = parsePick('Steelers bengals over 45.5');
+        expect(result).toEqual({
+          type: 'overunder',
+          team1: 'PIT',
+          team2: 'CIN',
+          direction: 'O',
+          line: 45.5,
+          fuzzyMatches: []
+        });
+      });
+
+      test('should parse "under" word with space separator', () => {
+        const result = parsePick('Chiefs Bills under 50');
+        expect(result).toEqual({
+          type: 'overunder',
+          team1: 'KC',
+          team2: 'BUF',
+          direction: 'U',
+          line: 50,
+          fuzzyMatches: []
         });
       });
     });
@@ -84,7 +137,8 @@ describe('PicksChecker', () => {
         expect(result).toEqual({
           type: 'spread',
           team: 'ARI',
-          line: -5.5
+          line: -5.5,
+          fuzzyMatches: []
         });
       });
 
@@ -93,7 +147,8 @@ describe('PicksChecker', () => {
         expect(result).toEqual({
           type: 'spread',
           team: 'BUF',
-          line: 3
+          line: 3,
+          fuzzyMatches: []
         });
       });
 
@@ -102,7 +157,8 @@ describe('PicksChecker', () => {
         expect(result).toEqual({
           type: 'spread',
           team: 'KC',
-          line: -7
+          line: -7,
+          fuzzyMatches: []
         });
       });
 
@@ -111,7 +167,8 @@ describe('PicksChecker', () => {
         expect(result).toEqual({
           type: 'spread',
           team: 'MIN',
-          line: -2.5
+          line: -2.5,
+          fuzzyMatches: []
         });
       });
     });
@@ -122,7 +179,8 @@ describe('PicksChecker', () => {
         expect(result).toEqual({
           type: 'spread',
           team: 'KC',
-          line: 0
+          line: 0,
+          fuzzyMatches: []
         });
       });
 
@@ -131,8 +189,32 @@ describe('PicksChecker', () => {
         expect(result).toEqual({
           type: 'spread',
           team: 'PIT',
-          line: 0
+          line: 0,
+          fuzzyMatches: []
         });
+      });
+    });
+
+    describe('Fuzzy matching', () => {
+      test('should fuzzy match team name with typo (up to 2 character edits)', () => {
+        // "Benglas" has distance 2 from "bengals" (transposition of 'l' and 'a')
+        const result = parsePick('Benglas +13.5');
+        expect(result.type).toBe('spread');
+        expect(result.team).toBe('CIN');
+        expect(result.fuzzyMatches.length).toBe(1);
+        expect(result.fuzzyMatches[0].matchType).toBe('fuzzy');
+        expect(result.fuzzyMatches[0].originalInput).toBe('Benglas');
+        expect(result.fuzzyMatches[0].matchedKey).toBe('bengals');
+      });
+
+      test('should fuzzy match in over/under pick', () => {
+        // "beng" would be 2 chars off from "bear", but might match "bengals" as partial
+        const result = parsePick('beng/pack O 44.5');
+        expect(result.type).toBe('overunder');
+        // "beng" should match CIN via partial matching (contains)
+        expect(result.team1).toBe('CIN');
+        // "pack" should match GB via partial matching
+        expect(result.team2).toBe('GB');
       });
     });
 
@@ -218,6 +300,26 @@ describe('PicksChecker', () => {
         };
         // Over requires > not >=, so this should be false
         expect(evaluatePick(pick, game)).toBe(false);
+      });
+
+      test('should correctly evaluate OVER pick when actual is under (real scenario)', () => {
+        // User reported: saints/pats over 45.5, actual was NE 25 + NO 19 = 44
+        const realGame = {
+          awayTeam: 'NO',
+          homeTeam: 'NE',
+          awayScore: 19,
+          homeScore: 25,
+          totalPoints: 44
+        };
+        const pick = {
+          type: 'overunder',
+          team1: 'NO',
+          team2: 'NE',
+          direction: 'O',
+          line: 45.5
+        };
+        // 44 is NOT > 45.5, so this should be FALSE (incorrect pick)
+        expect(evaluatePick(pick, realGame)).toBe(false);
       });
     });
 

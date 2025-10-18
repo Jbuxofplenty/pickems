@@ -370,7 +370,8 @@ function processPicks(picksData, gamesMap) {
     var detail = {
       pickText: pickText,
       type: parsedPick.type,
-      isCorrect: isCorrect
+      isCorrect: isCorrect,
+      fuzzyMatches: parsedPick.fuzzyMatches || []  // Track if fuzzy matching was used
     };
     
     if (parsedPick.type === 'overunder') {
@@ -402,52 +403,85 @@ function processPicks(picksData, gamesMap) {
 
 /**
  * Parses a pick string into structured data
- * @param {string} pickText - Pick string like "Cards -5.5" or "Bucs/Falcons O 47.5" or "Steelers bengals U 45.5"
+ * @param {string} pickText - Pick string like "Cards -5.5" or "Bucs/Falcons O 47.5" or "Steelers bengals under 45.5"
  * @return {Object} Parsed pick object or null if invalid
  */
 function parsePick(pickText) {
   var text = pickText.toString().trim();
+  var fuzzyMatches = [];
   
-  // Check for Over/Under format with slash: "Team1/Team2 O 47.5" or "Team1/Team2 U 47.5"
-  var ouMatch = text.match(/^(.+?)\/(.+?)\s+([OU])\s+([\d.]+)$/i);
+  // Check for Over/Under format with slash: "Team1/Team2 O 47.5" or "Team1/Team2 over 47.5"
+  var ouMatch = text.match(/^(.+?)\/(.+?)\s+(O|U|over|under)\s+([\d.]+)$/i);
   if (ouMatch) {
+    var team1Info = normalizeTeamName(ouMatch[1], true);
+    var team2Info = normalizeTeamName(ouMatch[2], true);
+    
+    if (team1Info.matchType === 'fuzzy') fuzzyMatches.push(team1Info);
+    if (team2Info.matchType === 'fuzzy') fuzzyMatches.push(team2Info);
+    
+    // Normalize direction to 'O' or 'U'
+    var direction = ouMatch[3].toUpperCase();
+    if (direction === 'OVER') direction = 'O';
+    if (direction === 'UNDER') direction = 'U';
+    
     return {
       type: 'overunder',
-      team1: normalizeTeamName(ouMatch[1]),
-      team2: normalizeTeamName(ouMatch[2]),
-      direction: ouMatch[3].toUpperCase(),  // 'O' or 'U'
-      line: parseFloat(ouMatch[4])
+      team1: team1Info.abbr,
+      team2: team2Info.abbr,
+      direction: direction,  // 'O' or 'U'
+      line: parseFloat(ouMatch[4]),
+      fuzzyMatches: fuzzyMatches
     };
   }
   
-  // Check for Over/Under format with space: "Team1 Team2 O 47.5" or "Team1 Team2 U 47.5"
-  var ouSpaceMatch = text.match(/^(.+?)\s+(.+?)\s+([OU])\s+([\d.]+)$/i);
+  // Check for Over/Under format with space: "Team1 Team2 O 47.5" or "Team1 Team2 over 47.5"
+  var ouSpaceMatch = text.match(/^(.+?)\s+(.+?)\s+(O|U|over|under)\s+([\d.]+)$/i);
   if (ouSpaceMatch) {
+    var team1Info = normalizeTeamName(ouSpaceMatch[1], true);
+    var team2Info = normalizeTeamName(ouSpaceMatch[2], true);
+    
+    if (team1Info.matchType === 'fuzzy') fuzzyMatches.push(team1Info);
+    if (team2Info.matchType === 'fuzzy') fuzzyMatches.push(team2Info);
+    
+    // Normalize direction to 'O' or 'U'
+    var direction = ouSpaceMatch[3].toUpperCase();
+    if (direction === 'OVER') direction = 'O';
+    if (direction === 'UNDER') direction = 'U';
+    
     return {
       type: 'overunder',
-      team1: normalizeTeamName(ouSpaceMatch[1]),
-      team2: normalizeTeamName(ouSpaceMatch[2]),
-      direction: ouSpaceMatch[3].toUpperCase(),  // 'O' or 'U'
-      line: parseFloat(ouSpaceMatch[4])
+      team1: team1Info.abbr,
+      team2: team2Info.abbr,
+      direction: direction,  // 'O' or 'U'
+      line: parseFloat(ouSpaceMatch[4]),
+      fuzzyMatches: fuzzyMatches
     };
   }
   
   // Check for Spread format: "Team -5.5" or "Team +5.5"
   var spreadMatch = text.match(/^(.+?)\s+([-+][\d.]+)$/);
   if (spreadMatch) {
+    var teamInfo = normalizeTeamName(spreadMatch[1], true);
+    if (teamInfo.matchType === 'fuzzy') fuzzyMatches.push(teamInfo);
+    
     return {
       type: 'spread',
-      team: normalizeTeamName(spreadMatch[1]),
-      line: parseFloat(spreadMatch[2])
+      team: teamInfo.abbr,
+      line: parseFloat(spreadMatch[2]),
+      fuzzyMatches: fuzzyMatches
     };
   }
   
   // Check for straight pick format: "Team" (no spread)
   if (text.length > 0) {
+    var teamInfo = normalizeTeamName(text, true);
+    if (teamInfo.matchType === 'fuzzy') fuzzyMatches.push(teamInfo);
+    
     return {
       type: 'spread',
-      team: normalizeTeamName(text),
-      line: 0  // Straight pick
+      team: teamInfo.abbr,
+      line: 0,  // Straight pick
+      fuzzyMatches: fuzzyMatches
     };
   }
   
@@ -654,11 +688,29 @@ function showPreviewAndConfirm(ui, sheet, picksData, results, dateRange) {
         } else {
           displayResult = result;
         }
+        
+        // Add fuzzy match indicator
+        if (detail.fuzzyMatches && detail.fuzzyMatches.length > 0) {
+          displayResult += ' 🔍';  // Add search icon for fuzzy matches
+        }
       } else {
         displayResult = result;
       }
       
-      preview += 'Row ' + rowNum + ': "' + pickText + '" → ' + displayResult + '\n';
+      preview += 'Row ' + rowNum + ': "' + pickText + '" → ' + displayResult;
+      
+      // Add fuzzy match details below
+      if (detail && detail.fuzzyMatches && detail.fuzzyMatches.length > 0) {
+        preview += '\n    ⚡ Fuzzy matched: ';
+        var matchDescriptions = [];
+        for (var j = 0; j < detail.fuzzyMatches.length; j++) {
+          var match = detail.fuzzyMatches[j];
+          matchDescriptions.push('"' + match.originalInput + '" → "' + match.matchedKey + '"');
+        }
+        preview += matchDescriptions.join(', ');
+      }
+      
+      preview += '\n';
     }
   }
   

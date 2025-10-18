@@ -33,6 +33,7 @@ describe('Utilities', () => {
       expect(normalizeTeamName('Cards')).toBe('ARI');
       expect(normalizeTeamName('Niners')).toBe('SF');
       expect(normalizeTeamName('Chiefs')).toBe('KC');
+      expect(normalizeTeamName('Commies')).toBe('WSH');
     });
 
     test('should handle city names', () => {
@@ -66,7 +67,8 @@ describe('Utilities', () => {
 
     test('should return uppercase for unknown teams', () => {
       // Note: "Unknown Team" contains "no" which matches Saints, so use different example
-      expect(normalizeTeamName('Fake Team XYZ')).toBe('FAKE TEAM XYZ');
+      // Non-alphanumeric characters are stripped, so spaces are removed
+      expect(normalizeTeamName('Fake Team XYZ')).toBe('FAKETEAMXYZ');
     });
 
     test('should handle whitespace', () => {

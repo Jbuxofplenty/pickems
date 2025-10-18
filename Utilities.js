@@ -135,6 +135,48 @@ function safeJsonParse(jsonString) {
 }
 
 // ===================================================================
+// STRING MATCHING UTILITIES
+// ===================================================================
+
+/**
+ * Calculates Levenshtein distance between two strings
+ * Used for fuzzy matching to handle typos
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string
+ * @return {number} The edit distance between the strings
+ */
+function levenshteinDistance(str1, str2) {
+  var s1 = str1.toLowerCase();
+  var s2 = str2.toLowerCase();
+  
+  var len1 = s1.length;
+  var len2 = s2.length;
+  
+  // Create distance matrix
+  var matrix = [];
+  for (var i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (var j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+  
+  // Fill matrix
+  for (var i = 1; i <= len1; i++) {
+    for (var j = 1; j <= len2; j++) {
+      var cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+  
+  return matrix[len1][len2];
+}
+
+// ===================================================================
 // NFL-SPECIFIC UTILITIES
 // ===================================================================
 
@@ -199,11 +241,15 @@ function getWeekFromDate(dateString) {
 /**
  * Normalizes team name to match ESPN API abbreviations
  * Very lenient matching to handle typos and various formats
+ * Uses Levenshtein distance for fuzzy matching (distance <= 2)
  * @param {string} teamName - Team name from user pick (can be full name, nickname, abbreviation, etc.)
- * @return {string} Normalized 2-3 letter team abbreviation matching ESPN API format
+ * @param {boolean} returnMatchInfo - If true, returns object with match info including fuzzy matches; if false, just returns abbreviation
+ * @return {string|Object} Normalized team abbreviation, or object with {abbr, matchType, originalInput, matchedKey, distance}
+ *                         matchType can be: 'exact', 'partial', 'fuzzy', or 'none'
  */
-function normalizeTeamName(teamName) {
-  var normalized = teamName.trim().toLowerCase();
+function normalizeTeamName(teamName, returnMatchInfo) {
+  var originalInput = teamName.trim();
+  var normalized = originalInput.toLowerCase().replace(/[^a-z0-9]/g, '');
   
   // Team abbreviation mappings (all lowercase keys for case-insensitive matching)
   var teamMap = {
@@ -270,22 +316,73 @@ function normalizeTeamName(teamName) {
     // Tennessee Titans
     'titans': 'TEN', 'titan': 'TEN', 'ten': 'TEN', 'tennessee': 'TEN',
     // Washington Commanders
-    'commanders': 'WSH', 'commander': 'WSH', 'command': 'WSH', 'wsh': 'WSH', 'washington': 'WSH'
+    'commanders': 'WSH', 'commander': 'WSH', 'command': 'WSH', 'wsh': 'WSH', 'washington': 'WSH', 'commies': 'WSH', 'commie': 'WSH'
   };
   
   // Try direct match first
   if (teamMap[normalized]) {
+    if (returnMatchInfo) {
+      return {
+        abbr: teamMap[normalized],
+        matchType: 'exact',
+        originalInput: originalInput,
+        matchedKey: normalized
+      };
+    }
     return teamMap[normalized];
   }
   
-  // Try partial match (contains) as fallback for typos
+  // Try partial match (contains) as fallback
   for (var key in teamMap) {
     if (normalized.indexOf(key) !== -1 || key.indexOf(normalized) !== -1) {
+      if (returnMatchInfo) {
+        return {
+          abbr: teamMap[key],
+          matchType: 'partial',
+          originalInput: originalInput,
+          matchedKey: key
+        };
+      }
       return teamMap[key];
     }
   }
   
+  // Try fuzzy match with Levenshtein distance <= 2 (up to two character edits)
+  var bestMatch = null;
+  var bestDistance = Infinity;
+  var bestKey = null;
+  
+  for (var key in teamMap) {
+    var distance = levenshteinDistance(normalized, key);
+    if (distance <= 2 && distance < bestDistance) {
+      bestMatch = teamMap[key];
+      bestDistance = distance;
+      bestKey = key;
+    }
+  }
+  
+  if (bestMatch) {
+    if (returnMatchInfo) {
+      return {
+        abbr: bestMatch,
+        matchType: 'fuzzy',
+        originalInput: originalInput,
+        matchedKey: bestKey,
+        distance: bestDistance
+      };
+    }
+    return bestMatch;
+  }
+  
   // Return uppercase original if no match found
+  if (returnMatchInfo) {
+    return {
+      abbr: normalized.toUpperCase(),
+      matchType: 'none',
+      originalInput: originalInput,
+      matchedKey: null
+    };
+  }
   return normalized.toUpperCase();
 }
 
