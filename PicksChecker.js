@@ -284,8 +284,8 @@ function processPicks(picksData, gamesMap) {
   var currentWeekDate = null;  // Track the Thursday date for current week
   var hasScoreDataForCurrentWeek = false;
   
-  // Process each row starting from row 2 (skip header)
-  for (var i = 1; i < picksData.length; i++) {
+  // Process each row starting from row 1 (first row can be a week header)
+  for (var i = 0; i < picksData.length; i++) {
     var row = picksData[i];
     var playerName = row[0];  // Column A
     var pickText = row[1];    // Column B
@@ -302,6 +302,7 @@ function processPicks(picksData, gamesMap) {
       // Get the week start date from column E
       if (weekStartDate) {
         currentWeekDate = new Date(weekStartDate);
+        
         // Find which week in the scores data matches this date
         hasScoreDataForCurrentWeek = checkIfScoreDataExists(currentWeekDate, gamesMap);
         
@@ -660,17 +661,17 @@ function showPreviewAndConfirm(ui, sheet, picksData, results, dateRange) {
   for (var i = 0; i < results.rowResults.length; i++) {
     var result = results.rowResults[i];
     if (result !== null && result !== 'pending') {
-      var rowNum = i + 2; // +2 for 1-based and header
+      var rowNum = i + 1; // +1 for 1-based indexing (sheet rows start at 1)
       var detail = results.rowDetails[i];
       var pickText = '';
       var displayResult = '';
       
       // Get pick text from detail or fallback to picksData
-      // Note: results.rowResults[i] corresponds to picksData[i+1] (since processPicks skips header at index 0)
+      // Note: results.rowResults[i] corresponds to picksData[i] (direct mapping)
       if (detail && detail.pickText) {
         pickText = detail.pickText;
-      } else if (picksData[i + 1] && picksData[i + 1][1]) {
-        pickText = picksData[i + 1][1];
+      } else if (picksData[i] && picksData[i][1]) {
+        pickText = picksData[i][1];
       }
       
       if (result === 'invalid') {
@@ -742,7 +743,7 @@ function writeResults(sheet, results) {
   
   for (var i = 0; i < results.rowResults.length; i++) {
     var result = results.rowResults[i];
-    var rowNum = i + 2;  // +2 because array is 0-based and we skip header
+    var rowNum = i + 1;  // +1 for 1-based indexing (sheet rows start at 1)
     
     if (result === null) {
       // Skip rows that don't have picks (headers, empty rows, weeks without score data)
