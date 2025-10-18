@@ -1,0 +1,49 @@
+# Test files
+**/*.test.js
+*.test.js
+
+# Mocks
+__mocks__/**
+**/__mocks__/**
+
+# Coverage
+coverage/**
+**/coverage/**
+
+# Node modules
+node_modules/**
+**/node_modules/**
+
+# Config files
+package.json
+package-lock.json
+yarn.lock
+.yarnrc.yml
+tsconfig.json
+jest.config.js
+
+# Documentation
+README.md
+TESTING.md
+LICENSE
+
+# Git files
+.git/**
+.gitignore
+.github/**
+
+# Scripts
+setup-tests.sh
+*.sh
+
+# IDE
+.vscode/**
+.idea/**
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+

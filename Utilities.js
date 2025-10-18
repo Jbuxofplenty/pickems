@@ -141,22 +141,32 @@ function safeJsonParse(jsonString) {
 /**
  * Calculates NFL week number from a given date
  * NFL regular season typically starts first Thursday of September
- * @param {string} dateString - Date in format YYYYMMDD or YYYY-MM-DD
+ * @param {string} dateString - Date in format YYYYMMDD, YYYY-MM-DD, or MM/DD/YYYY
  * @return {Object} Object with year and week number {year: 2025, week: 7}
  */
 function getWeekFromDate(dateString) {
-  // Parse the input date
-  var cleaned = dateString.replace(/-/g, '');
+  var year, month, day;
   
-  // Validate format (should be 8 digits)
-  if (!/^\d{8}$/.test(cleaned)) {
-    throw new Error('Invalid date format. Please use YYYYMMDD or YYYY-MM-DD (e.g., 20250904 or 2025-09-04)');
+  // Check for MM/DD/YYYY format (with slashes)
+  var slashMatch = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    month = parseInt(slashMatch[1]) - 1; // JavaScript months are 0-indexed
+    day = parseInt(slashMatch[2]);
+    year = parseInt(slashMatch[3]);
+  } else {
+    // Parse YYYYMMDD or YYYY-MM-DD format
+    var cleaned = dateString.replace(/-/g, '');
+    
+    // Validate format (should be 8 digits)
+    if (!/^\d{8}$/.test(cleaned)) {
+      throw new Error('Invalid date format. Please use YYYYMMDD, YYYY-MM-DD, or MM/DD/YYYY (e.g., 20250904, 2025-09-04, or 09/04/2025)');
+    }
+    
+    // Parse date components
+    year = parseInt(cleaned.substring(0, 4));
+    month = parseInt(cleaned.substring(4, 6)) - 1; // JavaScript months are 0-indexed
+    day = parseInt(cleaned.substring(6, 8));
   }
-  
-  // Parse date components
-  var year = parseInt(cleaned.substring(0, 4));
-  var month = parseInt(cleaned.substring(4, 6)) - 1; // JavaScript months are 0-indexed
-  var day = parseInt(cleaned.substring(6, 8));
   
   var inputDate = new Date(year, month, day);
   

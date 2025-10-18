@@ -1,0 +1,39 @@
+{
+  "name": "nfl-pickems",
+  "version": "1.0.0",
+  "description": "Automated NFL pick validation system for Google Sheets",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": ["nfl", "picks", "google-apps-script", "spreadsheet"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@types/google-apps-script": "^1.0.83"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "*.js",
+      "!*.test.js",
+      "!__mocks__/**",
+      "!coverage/**",
+      "!jest.config.js",
+      "!setup-tests.sh"
+    ],
+    "testMatch": [
+      "**/*.test.js"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/__mocks__/",
+      "\\.test\\.js$"
+    ],
+    "collectCoverage": false
+  }
+}
+

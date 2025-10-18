@@ -44,7 +44,7 @@ function fetchScores() {
     // Prompt user for date
     var response = ui.prompt(
       'Fetch Scores',
-      'Enter date (YYYYMMDD or YYYY-MM-DD) or leave blank for current week:\n\nExample: 20250904 or 2025-09-04',
+      'Enter date or leave blank for current week:',
       ui.ButtonSet.OK_CANCEL
     );
     
@@ -62,7 +62,12 @@ function fetchScores() {
     var dateMsg = dateString ? ' for date: ' + dateString : ' for current week';
     ui.alert('Scores fetched successfully' + dateMsg + '!\n\nGames found: ' + scores.length);
   } catch (error) {
-    SpreadsheetApp.getUi().alert('Error fetching scores: ' + error.message);
+    var errorMsg = error.message;
+    // Add helpful format info if it's a date format error
+    if (errorMsg.indexOf('Invalid date format') !== -1) {
+      errorMsg += '\n\nAccepted formats:\n• MM/DD/YYYY (e.g., 10/09/2025)\n• YYYYMMDD (e.g., 20251009)\n• YYYY-MM-DD (e.g., 2025-10-09)';
+    }
+    SpreadsheetApp.getUi().alert('Error fetching scores: ' + errorMsg);
   }
 }
 
